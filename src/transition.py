@@ -35,7 +35,7 @@ def load_image(file, scale):
         size = result.shape
         return result.reshape((size[1] * size[0] * size[2],)), size
     except UnidentifiedImageError:
-        print(f'[error]: cannot open {img} file')
+        print(f'[error]: cannot open {file} file')
         exit()
 
 
