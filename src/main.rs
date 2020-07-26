@@ -68,39 +68,12 @@ impl Render {
 
     pub fn render(self, fps: u8) {
         // аргументы для ffmpeg
+        #[rustfmt::skip]
         let arguments = [
-            "-f",
-            "rawvideo",
-            "-pix_fmt",
-            "rgb24",
-            "-video_size",
-            &format!("{}x{}", self.size.width, self.size.height),
-            "-r",
-            &format!("{}", fps),
-            "-i",
-            "-",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "slow",
-            "-profile:v",
-            "high",
-            "-crf",
-            "18",
-            "-coder",
-            "1",
-            "-pix_fmt",
-            "yuv420p",
-            "-vf",
-            "scale=iw:-2",
-            "-movflags",
-            "+faststart",
-            "-g",
-            "30",
-            "-bf",
-            "2",
-            "-y",
-            &self.output,
+            "-f", "rawvideo", "-pix_fmt", "rgb24", "-video_size", &format!("{}x{}", self.size.width, self.size.height),
+            "-r", &format!("{}", fps), "-i", "-", "-c:v", "libx264", "-preset", "slow", "-profile:v", "high",
+            "-crf", "18", "-coder", "1", "-pix_fmt", "yuv420p", "-vf", "scale=iw:-2", "-movflags", "+faststart",
+            "-g", "30", "-bf", "2", "-y", &self.output,
         ];
         // создаём процесс
         let mut process = match Command::new("ffmpeg")
