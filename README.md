@@ -1,6 +1,6 @@
 transition
 ---
-[want to see english version?](README_en.md)
+[english version](README_en.md)
 
 Автоматическое создание видео из двух фото переходом между ними по выбранному эффекту
 
