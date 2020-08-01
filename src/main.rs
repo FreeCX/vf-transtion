@@ -66,7 +66,10 @@ fn main() {
     let func: Box<dyn ffmpeg::TransitionFunc> = match method.as_ref() {
         "alpha" => Box::new(ts::AlphaBlend),
         "vertical" => Box::new(ts::Vertical),
-        method => panic!("unknown method {}", method)
+        method => {
+            println!("[error]: unknown method {}", method);
+            exit(-1);
+        }
     };
 
     // шаг для создания перехода на заданное время и fps
