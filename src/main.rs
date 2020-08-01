@@ -1,4 +1,3 @@
-#![allow(unused_imports, unused_variables)]
 extern crate lodepng;
 extern crate rgb;
 extern crate argparse;

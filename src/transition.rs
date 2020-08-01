@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use crate::ffmpeg::{ TransitionFunc, Size };
 
 pub struct AlphaBlend;
