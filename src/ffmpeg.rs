@@ -4,6 +4,7 @@ use std::process::{Command, Stdio};
 
 use crate::rgb::ComponentBytes;
 
+// наш трейт, которому должна соответствовать функция генерирующие transtion
 pub trait TransitionFunc {
     fn calc(&self, value: f32, im1: &Vec<u8>, im1: &Vec<u8>, size: &Size) -> Vec<u8>;
 }
@@ -31,6 +32,7 @@ impl Size {
 
 impl Render {
     pub fn first_image<P: AsRef<Path>>(mut self, filename: P) -> Render {
+        // пусть паникует если нет файла
         let (image, size) = load_image(filename).unwrap();
         self.image1 = image;
         self.size = size;
@@ -65,10 +67,13 @@ impl Render {
     pub fn transition_series(mut self, series: Vec<f32>, step: f32) -> Render {
         let mut iterator = series.iter();
         while let Some(f1) = iterator.next() {
+            // уверены что есть второе значение
             let f2 = iterator.next().unwrap();
             if f1 > f2 {
+                // переход по типу 0 -> 1
                 self = self.add_transition(*f1, *f2, -step);
             } else {
+                // переход по типу 1 -> 0
                 self = self.add_transition(*f1, *f2, step);
             }
         }
@@ -103,6 +108,7 @@ impl Render {
             let stdin = process.stdin.as_mut().unwrap();
             // и фигачим в него наши картиночки
             for value in &self.transition {
+                // вызываем функцию отвечающий за transtion
                 let img = (*method).calc(*value, &self.image1, &self.image2, &self.size);
                 match stdin.write_all(&img) {
                     Err(why) => panic!("couldn't write to ffmpeg stdin: {}", why),
