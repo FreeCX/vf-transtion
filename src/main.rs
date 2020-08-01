@@ -73,7 +73,7 @@ fn main() {
     };
 
     // шаг для создания перехода на заданное время и fps
-    let step = (transitions.len() / 2) as f32 / (fps * transition_time) as f32;
+    let step = (transitions.len() >> 1) as f32 / (fps as f32 * transition_time as f32);
 
     // тут должно быть всё понятно
     let i = Render::default()

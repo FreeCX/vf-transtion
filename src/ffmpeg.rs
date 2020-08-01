@@ -103,7 +103,7 @@ impl Render {
             let stdin = process.stdin.as_mut().unwrap();
             // и фигачим в него наши картиночки
             for value in &self.transition {
-                let img= (*method).calc(*value, &self.image1, &self.image2, &self.size);
+                let img = (*method).calc(*value, &self.image1, &self.image2, &self.size);
                 match stdin.write_all(&img) {
                     Err(why) => panic!("couldn't write to ffmpeg stdin: {}", why),
                     Ok(_) => (),
