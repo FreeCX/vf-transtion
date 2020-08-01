@@ -1,133 +1,85 @@
+#![allow(unused_imports, unused_variables)]
 extern crate lodepng;
 extern crate rgb;
+extern crate argparse;
 
-use std::io::Write;
-use std::path::Path;
-use std::process::{Command, Stdio};
+mod ffmpeg;
+mod transition;
 
-use crate::rgb::ComponentBytes;
+use std::process::exit;
 
-#[derive(Debug, Default, PartialEq, Eq)]
-struct Size {
-    width: usize,
-    height: usize,
-}
+use argparse::{ArgumentParser, Store, List, Print};
 
-#[derive(Debug, Default)]
-struct Render {
-    transition: Vec<f32>,
-    image1: Vec<u8>,
-    image2: Vec<u8>,
-    output: String,
-    size: Size,
-}
+use transition as ts;
+use ffmpeg::Render;
 
-impl Size {
-    fn new(width: usize, height: usize) -> Size {
-        Size { width, height }
-    }
-}
-
-impl Render {
-    pub fn first_image<P: AsRef<Path>>(mut self, filename: P) -> Render {
-        let (image, size) = load_image(filename).unwrap();
-        self.image1 = image;
-        self.size = size;
-        self
-    }
-
-    pub fn second_image<P: AsRef<Path>>(mut self, filename: P) -> Render {
-        let (image, size) = load_image(filename).unwrap();
-        // никаких переходов в случае картинок разного размера
-        if self.size != size {
-            panic!("image size mismatch");
-        }
-        self.image2 = image;
-        self
-    }
-
-    pub fn add_transition(mut self, start: f32, stop: f32, step: f32) -> Render {
-        // эти два варианта мы игнорируем, т.к. они расходятся
-        let bad_condition = (start > stop && step > 0.0) || (start < stop && step < 0.0);
-        // для всех остальных считаем количество шагов
-        let count = if !bad_condition {
-            ((start - stop) / step).abs() as u32 + 1
-        } else {
-            0
-        };
-        // и генерируем переход
-        let mut transition: Vec<f32> = (0..count).map(|x| start + x as f32 * step).collect();
-        self.transition.append(&mut transition);
-        self
-    }
-
-    pub fn set_output_file(mut self, output: &str) -> Render {
-        self.output = output.to_owned();
-        self
-    }
-
-    pub fn render(self, fps: u8) {
-        // аргументы для ffmpeg
-        #[rustfmt::skip]
-        let arguments = [
-            "-f", "rawvideo", "-pix_fmt", "rgb24", "-video_size", &format!("{}x{}", self.size.width, self.size.height),
-            "-r", &format!("{}", fps), "-i", "-", "-c:v", "libx264", "-preset", "slow", "-profile:v", "high",
-            "-crf", "18", "-coder", "1", "-pix_fmt", "yuv420p", "-vf", "scale=iw:-2", "-movflags", "+faststart",
-            "-g", "30", "-bf", "2", "-y", &self.output,
-        ];
-        // создаём процесс
-        let mut process = match Command::new("ffmpeg")
-            .args(&arguments)
-            .stdin(Stdio::piped())
-            .spawn()
-        {
-            Err(why) => panic!("couldn't spawn ffmpeg: {}", why),
-            Ok(process) => process,
-        };
-        {
-            // заимствуем stdin
-            let stdin = process.stdin.as_mut().unwrap();
-            // и фигачим в него наши картиночки
-            for alpha in &self.transition {
-                let img = self.blend(*alpha);
-                match stdin.write_all(&img) {
-                    Err(why) => panic!("couldn't write to ffmpeg stdin: {}", why),
-                    Ok(_) => (),
-                };
-            }
-        }
-        // ожидание завершения ffmpeg
-        let _result = process.wait().unwrap();
-    }
-
-    fn blend(&self, alpha: f32) -> Vec<u8> {
-        let mut r = vec![0; self.image1.len()];
-        for (d, (a, b)) in r.iter_mut().zip(self.image1.iter().zip(self.image2.iter())) {
-            *d = (*a as f32 * alpha + *b as f32 * (1.0 - alpha)).round() as u8;
-        }
-        r
-    }
-}
-
-fn load_image<P: AsRef<Path>>(filename: P) -> Result<(Vec<u8>, Size), lodepng::Error> {
-    let image = lodepng::decode24_file(filename)?;
-    let size = Size::new(image.width, image.height);
-    Ok((image.buffer.as_bytes().to_vec(), size))
-}
 
 fn main() {
+    // значения для генерации переходов
+    let mut transitions: Vec<f32> = vec![0.0, 1.0, 1.0, 0.0];
+    // загружаемые изображения
+    let mut images: Vec<String> = Vec::new();
+    // имя выходного файла
+    let mut output = String::from("render.mp4");
+    // используемый метод
+    let mut method = String::from("alpha");
     // время ролика в секундах
-    let transition_time = 5;
+    let mut transition_time = 10;
     // количество кадров в секунду у выходного видео
-    let fps = 25;
+    let mut fps = 25;
+
+    // парсинг аргрументов
+    {
+        let mut ap = ArgumentParser::new();
+
+        ap.set_description("Make special transition effect from two images");
+        ap.refer(&mut transition_time)
+          .add_option(&["-d", "--duration"], Store, "video duration in seconds");
+        ap.refer(&mut fps)
+          .add_option(&["-f", "--fps"], Store, "video fps");
+        ap.refer(&mut transitions)
+          .add_option(&["-t", "--transition"], List, "transition parameters");
+        ap.refer(&mut images)
+          .add_option(&["-i", "--images"], List, "input images");
+        ap.refer(&mut output)
+          .add_option(&["-o", "--output"], Store, "output file name");
+        ap.refer(&mut method)
+          .add_option(&["-m", "--method"], Store, "transition method (alpha|vertical)");
+        ap.add_option(&["-v", "--version"],
+            Print(env!("CARGO_PKG_VERSION").to_string()), "show version");
+
+        ap.parse_args_or_exit();
+    }
+
+    // проверки на валидность количества значений
+    if transitions.len() % 2 != 0 {
+        println!("[error]: transitions parameters must be a multiple by two");
+        exit(-1);
+    }
+
+    // проверки на валидность количества входных фоток
+    if images.len() != 2 {
+        println!("[error]: input images count != 2");
+        exit(-1);
+    }
+
+    // функция генерирующая переход
+    let func: Box<dyn ffmpeg::TransitionFunc> = match method.as_ref() {
+        "alpha" => Box::new(ts::AlphaBlend),
+        "vertical" => Box::new(ts::Vertical),
+        method => panic!("unknown method {}", method)
+    };
+
     // шаг для создания перехода на заданное время и fps
-    let step = 2.0 / (fps * transition_time) as f32;
+    let step = (transitions.len() / 2) as f32 / (fps * transition_time) as f32;
+
     // тут должно быть всё понятно
     let i = Render::default()
-        .first_image("./demo/01.png")
-        .second_image("./demo/02.png")
-        .add_transition(0.0, 1.0, step)
-        .add_transition(1.0, 0.0, -step)
-        .set_output_file("render.mp4");
-    i.render(fps);
+        .first_image(&images[0])
+        .second_image(&images[1])
+        .transition_series(transitions, step)
+        .set_output_file(&output);
+
+    // рендерим
+    i.render(func, fps);
 }
