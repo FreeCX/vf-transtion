@@ -85,7 +85,7 @@ impl Render {
         self
     }
 
-    pub fn render(self, method: Box<dyn TransitionFunc>, fps: u8) {
+    pub fn render(self, method: &dyn TransitionFunc, fps: u8) {
         // аргументы для ffmpeg
         #[rustfmt::skip]
         let arguments = [
@@ -109,7 +109,7 @@ impl Render {
             // и фигачим в него наши картиночки
             for value in &self.transition {
                 // вызываем функцию отвечающий за transtion
-                let img = (*method).calc(*value, &self.image1, &self.image2, &self.size);
+                let img = method.calc(*value, &self.image1, &self.image2, &self.size);
                 match stdin.write_all(&img) {
                     Err(why) => panic!("couldn't write to ffmpeg stdin: {}", why),
                     Ok(_) => (),

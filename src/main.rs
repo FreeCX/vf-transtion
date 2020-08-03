@@ -63,9 +63,9 @@ fn main() {
     }
 
     // функция генерирующая переход
-    let func: Box<dyn ffmpeg::TransitionFunc> = match method.as_ref() {
-        "alpha" => Box::new(ts::AlphaBlend),
-        "vertical" => Box::new(ts::Vertical),
+    let func: &dyn ffmpeg::TransitionFunc = match method.as_ref() {
+        "alpha" => &ts::AlphaBlend,
+        "vertical" => &ts::Vertical,
         method => {
             println!("[error]: unknown method {}", method);
             exit(-1);
