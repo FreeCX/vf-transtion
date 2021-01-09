@@ -14,20 +14,20 @@ use ffmpeg::Render;
 
 
 fn main() {
-    // значения для генерации переходов
+    // transition values
     let mut transitions: Vec<f32> = vec![0.0, 1.0, 1.0, 0.0];
-    // загружаемые изображения
+    // loadable images
     let mut images: Vec<String> = Vec::new();
-    // имя выходного файла
+    // output file name
     let mut output = String::from("render.mp4");
-    // используемый метод
+    // using transtion effect
     let mut method = String::from("alpha");
-    // время ролика в секундах
+    // video duration in secods
     let mut transition_time = 10;
-    // количество кадров в секунду у выходного видео
+    // output video fps
     let mut fps = 25;
 
-    // парсинг аргрументов
+    // lets parse application arguments
     {
         let mut ap = ArgumentParser::new();
 
@@ -50,19 +50,19 @@ fn main() {
         ap.parse_args_or_exit();
     }
 
-    // проверки на валидность количества значений
+    // validate values count
     if transitions.len() % 2 != 0 {
         println!("[error]: transitions parameters must be a multiple by two");
         exit(-1);
     }
 
-    // проверки на валидность количества входных фоток
+    // validate images count
     if images.len() != 2 {
         println!("[error]: input images count != 2");
         exit(-1);
     }
 
-    // функция генерирующая переход
+    // choice transition function
     let func: &dyn ffmpeg::TransitionFunc = match method.as_ref() {
         "alpha" => &ts::AlphaBlend,
         "vertical" => &ts::Vertical,
@@ -72,16 +72,16 @@ fn main() {
         }
     };
 
-    // шаг для создания перехода на заданное время и fps
+    // calculate transtition step
     let step = (transitions.len() >> 1) as f32 / (fps as f32 * transition_time as f32);
 
-    // тут должно быть всё понятно
+    // prepare render
     let i = Render::default()
         .first_image(&images[0])
         .second_image(&images[1])
         .transition_series(transitions, step)
         .set_output_file(&output);
 
-    // рендерим
+    // and render
     i.render(func, fps);
 }

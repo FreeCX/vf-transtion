@@ -4,7 +4,6 @@ use std::process::{Command, Stdio};
 
 use crate::rgb::ComponentBytes;
 
-// наш трейт, которому должна соответствовать функция генерирующие transtion
 pub trait TransitionFunc {
     fn calc(&self, value: f32, im1: &Vec<u8>, im1: &Vec<u8>, size: &Size) -> Vec<u8>;
 }
@@ -32,7 +31,7 @@ impl Size {
 
 impl Render {
     pub fn first_image<P: AsRef<Path>>(mut self, filename: P) -> Render {
-        // пусть паникует если нет файла
+        // panic if image not found
         let (image, size) = load_image(filename).unwrap();
         self.image1 = image;
         self.size = size;
@@ -41,7 +40,7 @@ impl Render {
 
     pub fn second_image<P: AsRef<Path>>(mut self, filename: P) -> Render {
         let (image, size) = load_image(filename).unwrap();
-        // никаких переходов в случае картинок разного размера
+        // panic if images not the same size
         if self.size != size {
             panic!("image size mismatch");
         }
@@ -50,15 +49,15 @@ impl Render {
     }
 
     pub fn add_transition(mut self, start: f32, stop: f32, step: f32) -> Render {
-        // эти два варианта мы игнорируем, т.к. они расходятся
+        // ignore this variants because is divergent
         let bad_condition = (start > stop && step > 0.0) || (start < stop && step < 0.0);
-        // для всех остальных считаем количество шагов
+        // count steps for transition
         let count = if !bad_condition {
             ((start - stop) / step).abs() as u32 + 1
         } else {
             0
         };
-        // и генерируем переход
+        // create transition
         let mut transition: Vec<f32> = (0..count).map(|x| start + x as f32 * step).collect();
         self.transition.append(&mut transition);
         self
@@ -67,13 +66,13 @@ impl Render {
     pub fn transition_series(mut self, series: Vec<f32>, step: f32) -> Render {
         let mut iterator = series.iter();
         while let Some(f1) = iterator.next() {
-            // уверены что есть второе значение
+            // we sure about second value exist
             let f2 = iterator.next().unwrap();
             if f1 > f2 {
-                // переход по типу 0 -> 1
+                // transition 0 -> 1
                 self = self.add_transition(*f1, *f2, -step);
             } else {
-                // переход по типу 1 -> 0
+                // transition 1 -> 0
                 self = self.add_transition(*f1, *f2, step);
             }
         }
@@ -86,7 +85,7 @@ impl Render {
     }
 
     pub fn render(self, method: &dyn TransitionFunc, fps: u8) {
-        // аргументы для ffmpeg
+        // ffmpeg args
         #[rustfmt::skip]
         let arguments = [
             "-f", "rawvideo", "-pix_fmt", "rgb24", "-video_size", &format!("{}x{}", self.size.width, self.size.height),
@@ -94,7 +93,7 @@ impl Render {
             "-crf", "18", "-coder", "1", "-pix_fmt", "yuv420p", "-vf", "scale=iw:-2", "-movflags", "+faststart",
             "-g", "30", "-bf", "2", "-y", &self.output,
         ];
-        // создаём процесс
+        // create ffmpeg with pipe
         let mut process = match Command::new("ffmpeg")
             .args(&arguments)
             .stdin(Stdio::piped())
@@ -104,11 +103,11 @@ impl Render {
             Ok(process) => process,
         };
         {
-            // заимствуем stdin
+            // borrow stdin
             let stdin = process.stdin.as_mut().unwrap();
-            // и фигачим в него наши картиночки
+            // and send images into it
             for value in &self.transition {
-                // вызываем функцию отвечающий за transtion
+                // calling transition function
                 let img = method.calc(*value, &self.image1, &self.image2, &self.size);
                 match stdin.write_all(&img) {
                     Err(why) => panic!("couldn't write to ffmpeg stdin: {}", why),
@@ -116,7 +115,7 @@ impl Render {
                 };
             }
         }
-        // ожидание завершения ffmpeg
+        // wait ffmpeg
         let _result = process.wait().unwrap();
     }
 }
