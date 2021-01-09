@@ -1,6 +1,6 @@
 transition
 ---
-Automatic video creation from two photos by transition between them according to the selected effect
+Create a video creation from two photos using implemented transitions
 
 Implemented in two languages:
 - [Rust](./src/main.rs)
@@ -19,10 +19,10 @@ Rust dependencies:
 - lodepng
 - rgb
 
-Implemented effects:
-- [2.5D effect, i dont know how it this called](https://gfycat.com/coldfavorableflicker)
+Implemented transitions:
+- [2.5D effect, i dont know how it called](https://gfycat.com/coldfavorableflicker)
 - [vertical transition](https://gfycat.com/silentimaginativegodwit)
 
 Files for the test [can be found here](./demo/)
 
-¹ only the first effect is implemented
+¹ only the first transition is implemented
